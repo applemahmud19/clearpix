@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060D18">
+<title>ClearPix – Watermark Remover</title>
+<style>
+:root{--bg:#060D18;--card:#0D1829;--glass:rgba(20,34,56,.7);--line:rgba(255,255,255,.09);--text:#F2F7FC;--mute:#8CA0B8;--sky:#4CC2FF;--sky2:#8BDDFF;--onsky:#04223A;--glow:rgba(76,194,255,.22);color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{background:radial-gradient(900px 420px at 50% -120px,var(--glow),transparent),var(--bg);color:var(--text);font:400 16px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,system-ui,sans-serif;min-height:100vh;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+.app{max-width:980px;margin:0 auto;padding:18px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+h1{font-size:30px;font-weight:700;letter-spacing:-.8px;margin:0}
+h1 small{display:block;font-size:14px;font-weight:500;color:var(--mute);letter-spacing:0}
+button{font:inherit;color:inherit;border:0;cursor:pointer;background:none}
+button:focus-visible,input:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
+.pill{padding:10px 18px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-weight:600;font-size:15px}
+.pill:disabled,.cta:disabled{opacity:.4;cursor:default}
+.cta{padding:15px 18px;border-radius:18px;background:linear-gradient(180deg,var(--sky2),var(--sky));color:var(--onsky);font-weight:700;font-size:16px;box-shadow:0 8px 28px var(--glow)}
+.cta.alt{background:var(--card);color:var(--text);border:1px solid var(--line);box-shadow:none}
+.stage{position:relative;background:var(--card);border:1px solid var(--line);border-radius:30px;min-height:340px;display:grid;place-items:center;overflow:hidden;padding:14px}
+.stage.drag{outline:2px dashed var(--sky)}
+.wrap{position:relative;line-height:0;max-width:100%}
+.wrap canvas{max-width:100%;max-height:62vh;width:auto;height:auto;border-radius:18px;display:block}
+.wrap canvas+canvas{position:absolute;inset:0;width:100%;height:100%;max-height:none}
+#mk{opacity:.62;cursor:crosshair;touch-action:none}
+#pv{pointer-events:none}
+.empty{text-align:center;padding:40px 20px}
+.ico{width:84px;height:84px;border-radius:24px;margin:0 auto 18px;display:grid;place-items:center;background:linear-gradient(160deg,var(--sky2),var(--sky));box-shadow:0 12px 36px var(--glow)}
+.empty h2{margin:0 0 6px;font-size:24px;letter-spacing:-.4px}
+.empty p{margin:0 auto 22px;color:var(--mute);max-width:34ch}
+.bar{margin-top:14px;display:grid;gap:12px;background:var(--glass);backdrop-filter:blur(22px) saturate(1.6);-webkit-backdrop-filter:blur(22px) saturate(1.6);border:1px solid var(--line);border-radius:26px;padding:12px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.seg{display:flex;background:var(--bg);border-radius:14px;padding:3px}
+.seg button{padding:8px 14px;border-radius:11px;font-weight:600;font-size:14px;color:var(--mute)}
+.seg button[aria-pressed=true]{background:var(--card);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.25)}
+.sl{display:flex;align-items:center;gap:10px;color:var(--mute);font-size:14px;flex:1;min-width:150px}
+input[type=range]{flex:1;accent-color:var(--sky);min-width:80px}
+.tools{display:flex;gap:8px}
+.tools .pill{padding:9px 14px;font-size:14px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.hint{color:var(--mute);font-size:13px;text-align:center;margin:12px 0 0}
+.strip{display:flex;gap:10px;overflow-x:auto;margin-top:16px;padding-bottom:4px}
+.strip button{flex:0 0 auto;width:68px;height:68px;border-radius:16px;overflow:hidden;border:2px solid transparent;background:var(--card);padding:0;position:relative}
+.strip button[aria-current=true]{border-color:var(--sky)}
+.strip img{width:100%;height:100%;object-fit:cover;display:block}
+.strip i{position:absolute;right:4px;bottom:4px;width:18px;height:18px;border-radius:50%;background:var(--sky);color:var(--onsky);font:700 11px/18px sans-serif;text-align:center;font-style:normal}
+.busy{position:absolute;inset:0;display:none;place-items:center;background:rgba(6,13,24,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-weight:600;z-index:3}
+.busy.on{display:grid}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,30px);background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--line);padding:11px 20px;border-radius:999px;font-weight:600;font-size:14px;opacity:0;transition:.3s;pointer-events:none;z-index:9;text-align:center;max-width:92vw}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>ClearPix<small>Watermark remover · unlimited photos</small></h1>
+    <div class="tools"><button class="pill" id="add">+ Add</button><button class="pill" id="saveAll" disabled>Save all</button></div>
+  </header>
+
+  <div class="stage" id="stage">
+    <div class="empty" id="empty">
+      <div class="ico"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#04223A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="9" cy="9" r="1.6"/><path d="M21 15l-4.5-4.5L6 21"/></svg></div>
+      <h2>Add your photos</h2>
+      <p>Pick as many as you like. Auto detect the watermark or paint over it, then tap Remove.</p>
+      <button class="cta" id="pick">Choose photos</button>
+    </div>
+    <div class="wrap" id="wrap" hidden>
+      <canvas id="view"></canvas><canvas id="mk"></canvas><canvas id="pv"></canvas>
+    </div>
+    <div class="busy" id="busy">Removing watermark…</div>
+  </div>
+
+  <div id="editor" hidden>
+    <div class="bar">
+      <div class="row">
+        <div class="seg" role="group" aria-label="Selection tool">
+          <button data-t="brush" aria-pressed="true">Brush</button><button data-t="erase" aria-pressed="false">Erase</button><button data-t="box" aria-pressed="false">Box</button><button data-t="tap" aria-pressed="false">Tap</button>
+        </div>
+        <div class="tools">
+          <button class="pill" id="clear">Clear</button>
+          <button class="pill" id="undo">Undo</button>
+          <button class="pill" id="cmp">Hold: original</button>
+        </div>
+      </div>
+      <div class="row">
+        <label class="sl">Size <input type="range" id="size" min="6" max="120" value="30"></label>
+        <label class="sl">Sensitivity <input type="range" id="sens" min="1" max="100" value="50"></label>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="cta alt" id="auto">✨ Auto detect</button>
+      <button class="cta" id="go">Remove watermark</button>
+      <button class="cta alt" id="all">Auto-clean all photos</button>
+      <button class="cta alt" id="save">Save HD (PNG)</button>
+    </div>
+    <p class="hint">Tap = tap on a letter or logo to select its colour. Auto detect works best on thin text and logos over smooth areas; fix misses with Brush / Erase.</p>
+  </div>
+
+  <div class="strip" id="strip"></div>
+  <input type="file" id="file" accept="image/*" multiple hidden>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const view=$('view'),mk=$('mk'),pv=$('pv'),vctx=view.getContext('2d'),mctx=mk.getContext('2d'),pctx=pv.getContext('2d');
+let items=[],cur=-1,tool='brush',drawing=false,last=null,start=null;
+const tick=()=>new Promise(r=>setTimeout(r,30));
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),2600)}
+
+/* ---------- files ---------- */
+async function addFiles(list){
+  const files=[...list].filter(f=>f.type.startsWith('image/'));
+  for(const f of files){
+    try{
+      const bmp=await createImageBitmap(f);
+      const c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;
+      c.getContext('2d').drawImage(bmp,0,0);
+      items.push({name:f.name.replace(/\.[^.]+$/,''),file:f,c,undo:[],done:false});
+    }catch(e){toast('Couldn’t open '+f.name)}
+  }
+  if(files.length)show(items.length-files.length);
+}
+function thumb(it){const t=document.createElement('canvas'),s=140/Math.max(it.c.width,it.c.height);t.width=Math.max(1,it.c.width*s);t.height=Math.max(1,it.c.height*s);t.getContext('2d').drawImage(it.c,0,0,t.width,t.height);return t.toDataURL('image/jpeg',.7)}
+function renderStrip(){
+  const s=$('strip');s.innerHTML='';
+  items.forEach((it,i)=>{
+    const b=document.createElement('button');b.setAttribute('aria-label','Photo '+(i+1));
+    if(i===cur)b.setAttribute('aria-current','true');
+    const im=document.createElement('img');im.src=it.th||(it.th=thumb(it));b.appendChild(im);
+    if(it.done){const d=document.createElement('i');d.textContent='✓';b.appendChild(d)}
+    b.onclick=()=>show(i);s.appendChild(b);
+  });
+  $('saveAll').disabled=!items.some(i=>i.done);
+}
+function show(i){
+  cur=i;const it=items[i];
+  for(const c of [view,mk,pv]){c.width=it.c.width;c.height=it.c.height}
+  vctx.drawImage(it.c,0,0);
+  $('empty').hidden=true;$('wrap').hidden=false;$('editor').hidden=false;
+  renderStrip();
+}
+
+/* ---------- manual selection ---------- */
+function pt(e){const r=mk.getBoundingClientRect(),s=mk.width/r.width;return{x:(e.clientX-r.left)*s,y:(e.clientY-r.top)*s}}
+function stroke(a,b){
+  mctx.globalCompositeOperation=tool==='erase'?'destination-out':'source-over';
+  mctx.strokeStyle='#4CC2FF';mctx.lineCap=mctx.lineJoin='round';
+  mctx.lineWidth=(+$('size').value+4)*(mk.width/mk.getBoundingClientRect().width);
+  mctx.beginPath();mctx.moveTo(a.x,a.y);mctx.lineTo(b.x+.01,b.y);mctx.stroke();
+  mctx.globalCompositeOperation='source-over';
+}
+mk.addEventListener('pointerdown',e=>{
+  if(cur<0)return;e.preventDefault();const p=pt(e);
+  if(tool==='tap')return wand(p);
+  mk.setPointerCapture(e.pointerId);drawing=true;last=start=p;
+  if(tool==='brush'||tool==='erase')stroke(p,p);
+});
+mk.addEventListener('pointermove',e=>{
+  if(!drawing)return;const p=pt(e);
+  if(tool==='box'){pctx.clearRect(0,0,pv.width,pv.height);pctx.fillStyle='rgba(76,194,255,.7)';pctx.fillRect(start.x,start.y,p.x-start.x,p.y-start.y)}
+  else stroke(last,p);
+  last=p;
+});
+const endDraw=()=>{
+  if(!drawing)return;drawing=false;
+  if(tool==='box'){pctx.clearRect(0,0,pv.width,pv.height);mctx.fillStyle='#4CC2FF';mctx.fillRect(start.x-3,start.y-3,last.x-start.x+6,last.y-start.y+6)}
+};
+mk.addEventListener('pointerup',endDraw);mk.addEventListener('pointercancel',endDraw);
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{
+  tool=b.dataset.t;document.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+});
+$('clear').onclick=()=>mctx.clearRect(0,0,mk.width,mk.height);
+
+/* Tap: select connected pixels of similar colour around the tap */
+function wand(p){
+  const it=items[cur],W=it.c.width,H=it.c.height,R=Math.round(Math.max(W,H)*.3);
+  const px=Math.round(p.x),py=Math.round(p.y),x0=Math.max(0,px-R),y0=Math.max(0,py-R),w=Math.min(W,px+R)-x0,h=Math.min(H,py+R)-y0;
+  const d=it.c.getContext('2d').getImageData(x0,y0,w,h).data,sx=px-x0,sy=py-y0,s0=(sy*w+sx)*4;
+  const r=d[s0],g=d[s0+1],b=d[s0+2],tol=(10+$('sens').value*.5)*3;
+  const seen=new Uint8Array(w*h),st=new Int32Array(w*h),out=new ImageData(w,h);let sp=0,n=0;
+  st[sp++]=sy*w+sx;seen[sy*w+sx]=1;
+  while(sp){
+    const i=st[--sp],x=i%w,y=(i/w)|0,q=i*4;
+    if(Math.abs(d[q]-r)+Math.abs(d[q+1]-g)+Math.abs(d[q+2]-b)>tol)continue;
+    out.data[q]=76;out.data[q+1]=194;out.data[q+2]=255;out.data[q+3]=255;n++;
+    if(x>0&&!seen[i-1]){seen[i-1]=1;st[sp++]=i-1}
+    if(x<w-1&&!seen[i+1]){seen[i+1]=1;st[sp++]=i+1}
+    if(y>0&&!seen[i-w]){seen[i-w]=1;st[sp++]=i-w}
+    if(y<h-1&&!seen[i+w]){seen[i+w]=1;st[sp++]=i+w}
+  }
+  if(n>w*h*.5)return toast('Too much selected – lower Sensitivity');
+  const t=document.createElement('canvas');t.width=w;t.height=h;t.getContext('2d').putImageData(out,0,0);
+  const o=Math.max(1,Math.round(W/700));
+  for(let dx=-2*o;dx<=2*o;dx+=o)for(let dy=-2*o;dy<=2*o;dy+=o)mctx.drawImage(t,x0+dx,y0+dy);
+}
+
+/* ---------- auto detect ---------- */
+function mm(a,w,h,k,mx){
+  const t=new Float32Array(w*h),o=new Float32Array(w*h);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){let v=mx?-1e9:1e9;for(let j=-k;j<=k;j++){const xx=x+j;if(xx<0||xx>=w)continue;const q=a[y*w+xx];v=mx?(q>v?q:v):(q<v?q:v)}t[y*w+x]=v}
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){let v=mx?-1e9:1e9;for(let j=-k;j<=k;j++){const yy=y+j;if(yy<0||yy>=h)continue;const q=t[yy*w+x];v=mx?(q>v?q:v):(q<v?q:v)}o[y*w+x]=v}
+  return o;
+}
+/* Thin bright/dark structures (text, logos) = top-hat filters; then drop small specks */
+function detect(c,sens){
+  const W=c.width,H=c.height,s=Math.min(1,1000/Math.max(W,H)),w=Math.max(8,Math.round(W*s)),h=Math.max(8,Math.round(H*s));
+  const t=document.createElement('canvas');t.width=w;t.height=h;const x=t.getContext('2d');x.drawImage(c,0,0,w,h);
+  const d=x.getImageData(0,0,w,h).data,g=new Float32Array(w*h);
+  for(let i=0;i<w*h;i++)g[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
+  const k=Math.max(2,Math.round(Math.max(w,h)/160));
+  const op=mm(mm(g,w,h,k,0),w,h,k,1),cl=mm(mm(g,w,h,k,1),w,h,k,0),T=45-sens*.38,m=new Float32Array(w*h);
+  for(let i=0;i<w*h;i++)if(g[i]-op[i]>T||cl[i]-g[i]>T)m[i]=1;
+  const d1=mm(m,w,h,2,1),lab=new Uint8Array(w*h),keep=new Uint8Array(w*h),st=new Int32Array(w*h),minA=Math.max(12,w*h*.0003);
+  let tot=0;
+  for(let s0=0;s0<w*h;s0++){
+    if(!d1[s0]||lab[s0])continue;
+    let sp=0;const comp=[];st[sp++]=s0;lab[s0]=1;
+    while(sp){
+      const i=st[--sp],xx=i%w;comp.push(i);
+      if(xx>0&&d1[i-1]&&!lab[i-1]){lab[i-1]=1;st[sp++]=i-1}
+      if(xx<w-1&&d1[i+1]&&!lab[i+1]){lab[i+1]=1;st[sp++]=i+1}
+      if(i>=w&&d1[i-w]&&!lab[i-w]){lab[i-w]=1;st[sp++]=i-w}
+      if(i<w*(h-1)&&d1[i+w]&&!lab[i+w]){lab[i+w]=1;st[sp++]=i+w}
+    }
+    if(comp.length>=minA){for(const i of comp)keep[i]=1;tot+=comp.length}
+  }
+  const cov=tot/(w*h);if(cov>.4||!tot)return{n:0,cov};
+  const img=new ImageData(w,h);
+  for(let i=0;i<w*h;i++)if(keep[i]){img.data[i*4]=76;img.data[i*4+1]=194;img.data[i*4+2]=255;img.data[i*4+3]=255}
+  x.putImageData(img,0,0);
+  const o=document.createElement('canvas');o.width=W;o.height=H;o.getContext('2d').drawImage(t,0,0,W,H);
+  return{cv:o,n:tot,cov};
+}
+$('auto').onclick=async()=>{
+  const it=items[cur];if(!it)return;
+  $('busy').textContent='Looking for watermark…';$('busy').classList.add('on');await tick();
+  const r=detect(it.c,+$('sens').value);
+  $('busy').classList.remove('on');$('busy').textContent='Removing watermark…';
+  if(!r.n)return toast(r.cov>.4?'Too busy to detect – use Brush or Tap':'Nothing found – raise Sensitivity or use Brush');
+  mctx.drawImage(r.cv,0,0);toast('Detected – fix with Brush/Erase, then Remove');
+};
+
+/* ---------- inpainting ---------- */
+function holeOf(cv){const W=cv.width,H=cv.height,m=cv.getContext('2d').getImageData(0,0,W,H).data,h=new Uint8Array(W*H);let n=0;for(let i=0;i<W*H;i++)if(m[i*4+3]>8){h[i]=1;n++}return n?h:null}
+function pushUndo(it,p){it.undo.push(p);if(it.undo.length>6)it.undo.shift()}
+
+/* Push–pull fill from surrounding pixels at every scale + matched film grain */
+function inpaint(ctx,hole,W,H){
+  let x0=W,y0=H,x1=-1,y1=-1;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(hole[y*W+x]){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}
+  if(x1<0)return null;
+  const mg=Math.max(16,Math.round(Math.max(x1-x0,y1-y0)*.25));
+  x0=Math.max(0,x0-mg);y0=Math.max(0,y0-mg);x1=Math.min(W-1,x1+mg);y1=Math.min(H-1,y1+mg);
+  const bw=x1-x0+1,bh=y1-y0+1,id=ctx.getImageData(x0,y0,bw,bh),d=id.data,before=new ImageData(new Uint8ClampedArray(d),bw,bh);
+  const c0=new Float32Array(bw*bh*3),k0=new Uint8Array(bw*bh),hm=new Uint8Array(bw*bh);
+  for(let y=0;y<bh;y++)for(let x=0;x<bw;x++){const i=y*bw+x;hm[i]=hole[(y+y0)*W+x+x0];k0[i]=hm[i]?0:1;c0[i*3]=d[i*4];c0[i*3+1]=d[i*4+1];c0[i*3+2]=d[i*4+2]}
+  const L=[{w:bw,h:bh,c:c0,k:k0}];
+  while(L[L.length-1].w>1||L[L.length-1].h>1){
+    const p=L[L.length-1],w=(p.w+1)>>1,h=(p.h+1)>>1,c=new Float32Array(w*h*3),k=new Uint8Array(w*h);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      let s=0,r=0,g=0,b=0;
+      for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){const xx=2*x+dx,yy=2*y+dy;if(xx<p.w&&yy<p.h){const j=yy*p.w+xx;if(p.k[j]){r+=p.c[j*3];g+=p.c[j*3+1];b+=p.c[j*3+2];s++}}}
+      if(s){const i=y*w+x;c[i*3]=r/s;c[i*3+1]=g/s;c[i*3+2]=b/s;k[i]=1}
+    }
+    L.push({w,h,c,k});
+  }
+  const top=L[L.length-1];if(!top.k[0]){top.c.fill(128);top.k[0]=1}
+  for(let l=L.length-2;l>=0;l--){
+    const t=L[l],q=L[l+1],hl=[];
+    for(let y=0;y<t.h;y++)for(let x=0;x<t.w;x++){
+      const i=y*t.w+x;if(t.k[i])continue;hl.push(i);
+      const u=Math.min(Math.max((x+.5)/2-.5,0),q.w-1),v=Math.min(Math.max((y+.5)/2-.5,0),q.h-1);
+      const ux=Math.floor(u),vy=Math.floor(v),fx=u-ux,fy=v-vy,ux2=Math.min(ux+1,q.w-1),vy2=Math.min(vy+1,q.h-1);
+      for(let ch=0;ch<3;ch++){
+        const a=q.c[(vy*q.w+ux)*3+ch],b=q.c[(vy*q.w+ux2)*3+ch],cc=q.c[(vy2*q.w+ux)*3+ch],dd=q.c[(vy2*q.w+ux2)*3+ch];
+        t.c[i*3+ch]=(a*(1-fx)+b*fx)*(1-fy)+(cc*(1-fx)+dd*fx)*fy;
+      }
+    }
+    const it=l===0?14:4,w=t.w,h=t.h;
+    for(let n=0;n<it;n++)for(const i of hl){
+      const x=i%w,y=(i/w)|0,a=y>0?i-w:i,b=y<h-1?i+w:i,cc=x>0?i-1:i,dd=x<w-1?i+1:i;
+      for(let ch=0;ch<3;ch++)t.c[i*3+ch]=(t.c[a*3+ch]+t.c[b*3+ch]+t.c[cc*3+ch]+t.c[dd*3+ch])/4;
+    }
+    for(const i of hl)t.k[i]=1;
+  }
+  let sum=0,cnt=0;
+  for(let y=0;y<bh;y++)for(let x=0;x<bw-1;x+=2){const i=y*bw+x;if(hm[i]||hm[i+1])continue;sum+=Math.abs(d[i*4+1]-d[i*4+5]);cnt++}
+  const amp=Math.min(6,cnt?sum/cnt*.8:0);
+  for(let i=0;i<bw*bh;i++)if(hm[i]){
+    const nz=(Math.random()-.5)*2*amp;
+    for(let ch=0;ch<3;ch++)d[i*4+ch]=Math.max(0,Math.min(255,c0[i*3+ch]+nz));
+  }
+  ctx.putImageData(id,x0,y0);
+  return{x:x0,y:y0,img:before};
+}
+
+$('go').onclick=async()=>{
+  const it=items[cur];if(!it)return;
+  const hole=holeOf(mk);if(!hole)return toast('Select the watermark first (Auto detect or Brush)');
+  $('busy').classList.add('on');await tick();
+  const p=inpaint(it.c.getContext('2d'),hole,mk.width,mk.height);
+  if(p){pushUndo(it,p);it.done=true;it.th=null}
+  vctx.drawImage(it.c,0,0);mctx.clearRect(0,0,mk.width,mk.height);renderStrip();
+  $('busy').classList.remove('on');toast('Watermark removed');
+};
+$('all').onclick=async()=>{
+  if(!items.length)return;
+  $('busy').classList.add('on');let n=0;
+  for(let i=0;i<items.length;i++){
+    $('busy').textContent='Cleaning '+(i+1)+' / '+items.length+'…';await tick();
+    const it=items[i],r=detect(it.c,+$('sens').value);if(!r.n)continue;
+    const hole=holeOf(r.cv),p=hole&&inpaint(it.c.getContext('2d'),hole,it.c.width,it.c.height);
+    if(p){pushUndo(it,p);it.done=true;it.th=null;n++}
+  }
+  $('busy').classList.remove('on');$('busy').textContent='Removing watermark…';
+  show(cur);toast(n?('Cleaned '+n+' of '+items.length+' photos'):'No watermark found – try Sensitivity up');
+};
+$('undo').onclick=()=>{
+  const it=items[cur];if(!it||!it.undo.length)return toast('Nothing to undo');
+  const p=it.undo.pop();it.c.getContext('2d').putImageData(p.img,p.x,p.y);vctx.drawImage(it.c,0,0);
+  if(!it.undo.length)it.done=false;it.th=null;renderStrip();
+};
+async function showOrig(on){
+  const it=items[cur];if(!it)return;it.hold=on;
+  if(on){const b=await createImageBitmap(it.file);if(it.hold)vctx.drawImage(b,0,0)}else vctx.drawImage(it.c,0,0);
+}
+const cm=$('cmp');cm.addEventListener('pointerdown',()=>showOrig(true));['pointerup','pointerleave','pointercancel'].forEach(n=>cm.addEventListener(n,()=>showOrig(false)));
+
+/* ---------- save (full resolution PNG) ---------- */
+async function saveOne(it){
+  const blob=await new Promise(r=>it.c.toBlob(r,'image/png')),name=it.name+'-clean.png';
+  try{
+    const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);
+    toast('Saved in full resolution');
+  }catch(e){toast('Couldn’t save this photo')}
+}
+$('save').onclick=()=>{if(items[cur])saveOne(items[cur])};
+$('saveAll').onclick=async()=>{for(const it of items.filter(i=>i.done)){await saveOne(it);await new Promise(r=>setTimeout(r,500))}};
+
+$('pick').onclick=$('add').onclick=()=>$('file').click();
+$('file').onchange=e=>{addFiles(e.target.files);e.target.value=''};
+const st=$('stage');
+['dragenter','dragover'].forEach(n=>st.addEventListener(n,e=>{e.preventDefault();st.classList.add('drag')}));
+['dragleave','drop'].forEach(n=>st.addEventListener(n,e=>{e.preventDefault();st.classList.remove('drag')}));
+st.addEventListener('drop',e=>addFiles(e.dataTransfer.files));
+</script>
+</body>
+</html>
